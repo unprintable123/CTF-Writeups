@@ -91,6 +91,51 @@ def flatter(M):
     ret = check_output(["flatter"], input=z.encode())
     return matrix(M.nrows(), M.ncols(), map(int, findall(b"-?\\d+", ret)))
 
+def modular_hermite_form(M):
+    ID = identity_matrix(ZZ, M.ncols())
+    modulus = M.base_ring().cardinality()
+    rows = M.rows()
+    basis = []
+    for i in tqdm(range(M.ncols())):
+        b = rows[0]
+        bi = ZZ(b[i])
+        if bi != 0:
+            g, u, v = xgcd(bi, modulus)
+            b = u * b
+            bi = ZZ(b[i])
+        for r in rows[1:]:
+            ri = ZZ(r[i])
+            if ri == 0:
+                continue
+            if bi == 0:
+                b = r
+                bi = ri
+                continue
+            if ri % bi == 0:
+                continue
+            else:
+                g, u, v = xgcd(bi, ri)
+                b = u * b + v * r
+                bi = ZZ(b[i])
+                assert bi == g
+        if bi == 0:
+            basis.append(ID.row(i)*modulus)
+            continue
+        g, u, v = xgcd(bi, modulus)
+        b = u * b
+        bi = ZZ(b[i])
+        basis.append(b)
+        new_rows = []
+        for r in rows:
+            c = ZZ(r[i]) // bi
+            new_r = r - c * b
+            if not new_r.is_zero():
+                new_rows.append(new_r)
+        rows = new_rows
+        if len(rows) == 0:
+            rows.append(zero_vector(ZZ, M.ncols()))
+    return matrix(ZZ, basis)
+
 def babai_cvp(B, t, perform_reduction=True):
     if perform_reduction:
         B = B.LLL(delta=0.75)
